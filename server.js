@@ -2,7 +2,6 @@ const express = require('express');
 const Hyperswarm = require('hyperswarm');
 const crypto = require('crypto');
 const b4a = require('b4a');
-const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,7 +10,7 @@ const PORT = process.env.PORT || 3000;
 const TOPIC_NAME = 'hypermind-lklynet-v1';
 const TOPIC = crypto.createHash('sha256').update(TOPIC_NAME).digest();
 
-const MY_ID = uuidv4();
+const MY_ID = crypto.randomUUID();
 let mySeq = 0; 
 
 const seenPeers = new Map();
