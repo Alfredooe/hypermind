@@ -1,19 +1,14 @@
-FROM node:18-bullseye
+FROM node:18-alpine
 
 WORKDIR /app
 
-# Install build dependencies including cmake for native modules
-RUN apt-get update && apt-get install -y \
-    python3 \
-    make \
-    g++ \
-    cmake \
-    && rm -rf /var/lib/apt/lists/*
+# Install build dependencies
+RUN apk add --no-cache python3 make g++ linux-headers git
 
 COPY package*.json ./
 
-# Install dependencies and force rebuild
-RUN npm install --production && npm rebuild
+# Install dependencies with build flags for udx-native
+RUN npm install --production --build-from-source
 
 COPY server.js ./
 
