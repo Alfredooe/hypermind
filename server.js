@@ -12,6 +12,69 @@ const TOPIC = crypto.createHash("sha256").update(TOPIC_NAME).digest();
 // Gossip protocol tuning
 const GOSSIP_FANOUT = 3; // Relay to max 3 random peers instead of all
 
+// --- BLOOM FILTER FOR MESSAGE DEDUPLICATION ---
+// Simple bloom filter to prevent re-relaying messages we've already seen
+class BloomFilter {
+  constructor(size = 10000, hashCount = 3) {
+    this.size = size;
+    this.hashCount = hashCount;
+    this.bits = new Uint8Array(Math.ceil(size / 8));
+  }
+
+  _hash(str, seed) {
+    let h = seed;
+    for (let i = 0; i < str.length; i++) {
+      h = (h * 31 + str.charCodeAt(i)) >>> 0;
+    }
+    return h % this.size;
+  }
+
+  add(item) {
+    for (let i = 0; i < this.hashCount; i++) {
+      const idx = this._hash(item, i * 0x9e3779b9);
+      this.bits[idx >>> 3] |= (1 << (idx & 7));
+    }
+  }
+
+  has(item) {
+    for (let i = 0; i < this.hashCount; i++) {
+      const idx = this._hash(item, i * 0x9e3779b9);
+      if ((this.bits[idx >>> 3] & (1 << (idx & 7))) === 0) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  clear() {
+    this.bits.fill(0);
+  }
+}
+
+// Time-bucketed bloom filter - rotates every 30 seconds
+let currentBloom = new BloomFilter();
+let previousBloom = new BloomFilter();
+
+function rotateBloomFilters() {
+  previousBloom = currentBloom;
+  currentBloom = new BloomFilter();
+}
+
+// Check if we've recently relayed this message
+function hasRelayedMessage(id, seq) {
+  const key = `${id}:${seq}`;
+  return currentBloom.has(key) || previousBloom.has(key);
+}
+
+// Mark message as relayed
+function markRelayed(id, seq) {
+  const key = `${id}:${seq}`;
+  currentBloom.add(key);
+}
+
+// Rotate bloom filters periodically
+setInterval(rotateBloomFilters, 30000);
+
 // --- SECURITY ---
 // We use Ed25519 for signatures and a PoW puzzle to prevent Sybil attacks.
 // Difficulty: Hash(ID + nonce) must start with '0000'
@@ -160,7 +223,9 @@ function handleMessage(msg, sourceSocket) {
 
       if (wasNew) broadcastUpdate();
 
-      if (hops < 3) {
+      // Only relay if we haven't already relayed this message (bloom filter check)
+      if (hops < 3 && !hasRelayedMessage(id, seq)) {
+        markRelayed(id, seq);
         relayMessage({ ...msg, hops: hops + 1 }, sourceSocket);
       }
     } catch (e) {
@@ -172,7 +237,9 @@ function handleMessage(msg, sourceSocket) {
       seenPeers.delete(id);
       broadcastUpdate();
 
-      if (hops < 3) {
+      // Use id:leave as key for LEAVE messages
+      if (hops < 3 && !hasRelayedMessage(id, "leave")) {
+        markRelayed(id, "leave");
         relayMessage({ ...msg, hops: hops + 1 }, sourceSocket);
       }
     }
