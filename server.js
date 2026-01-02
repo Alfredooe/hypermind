@@ -118,11 +118,18 @@ function handleMessage(msg, sourceSocket) {
     // 2. Verify Signature
     if (!sig) return;
     try {
-      const key = crypto.createPublicKey({
-        key: Buffer.from(id, "hex"),
-        format: "der",
-        type: "spki",
-      });
+      let key;
+      const storedPeer = seenPeers.get(id);
+      if (storedPeer && storedPeer.key) {
+        key = storedPeer.key;
+      } else {
+        key = crypto.createPublicKey({
+          key: Buffer.from(id, "hex"),
+          format: "der",
+          type: "spki",
+        });
+      }
+
       const verified = crypto.verify(
         null,
         Buffer.from(`seq:${seq}`),
@@ -130,35 +137,40 @@ function handleMessage(msg, sourceSocket) {
         Buffer.from(sig, "hex")
       );
       if (!verified) return; // Invalid Signature
+
+      // Store key for future use if not already stored
+      if (!storedPeer || !storedPeer.key) {
+        // We'll attach it when we update seenPeers below
+      }
+
+      if (hops === 0) {
+        sourceSocket.peerId = id;
+      }
+
+      const now = Date.now();
+      const stored = seenPeers.get(id);
+
+      let shouldUpdate = false;
+
+      if (!stored) {
+        // New peer
+        shouldUpdate = true;
+      } else if (seq > stored.seq) {
+        shouldUpdate = true;
+      }
+
+      if (shouldUpdate) {
+        const wasNew = !stored;
+        seenPeers.set(id, { seq, lastSeen: now, key });
+
+        if (wasNew) broadcastUpdate();
+
+        if (hops < 3) {
+          relayMessage({ ...msg, hops: hops + 1 }, sourceSocket);
+        }
+      }
     } catch (e) {
       return;
-    }
-
-    if (hops === 0) {
-      sourceSocket.peerId = id;
-    }
-
-    const now = Date.now();
-    const stored = seenPeers.get(id);
-
-    let shouldUpdate = false;
-
-    if (!stored) {
-      // New peer
-      shouldUpdate = true;
-    } else if (seq > stored.seq) {
-      shouldUpdate = true;
-    }
-
-    if (shouldUpdate) {
-      const wasNew = !stored;
-      seenPeers.set(id, { seq, lastSeen: now });
-
-      if (wasNew) broadcastUpdate();
-
-      if (hops < 3) {
-        relayMessage({ ...msg, hops: hops + 1 }, sourceSocket);
-      }
     }
   } else if (msg.type === "LEAVE") {
     const { id, hops } = msg;
@@ -207,14 +219,14 @@ setInterval(() => {
   const now = Date.now();
   let changed = false;
   for (const [id, data] of seenPeers) {
-    if (now - data.lastSeen > 2500) {
+    if (now - data.lastSeen > 15000) {
       seenPeers.delete(id);
       changed = true;
     }
   }
 
   if (changed) broadcastUpdate();
-}, 500);
+}, 5000);
 
 // Graceful Shutdown
 function handleShutdown() {
