@@ -10,7 +10,7 @@ const TOPIC_NAME = "hypermind-lklynet-v1";
 const TOPIC = crypto.createHash("sha256").update(TOPIC_NAME).digest();
 
 // Gossip protocol tuning
-const GOSSIP_FANOUT = 3; // Relay to max 3 random peers instead of all
+const GOSSIP_FANOUT = 10; // Relay to max 10 random peers instead of all
 const HEARTBEAT_INTERVAL_FAST = 1000; // 1 second during startup
 const HEARTBEAT_INTERVAL_SLOW = 15000; // 15 seconds at steady state
 const STARTUP_DURATION = 120000; // Stay in fast mode for 2 minutes
@@ -276,9 +276,6 @@ function handleMessage(msg, sourceSocket) {
     // 3. Verify Signature
     if (!sig) return;
     try {
-      // Enforce MAX_PEERS for new peers
-      if (!stored && seenPeers.size >= MAX_PEERS) return;
-
       // Get or create the raw DER buffer (lightweight storage)
       const keyDer = stored?.keyDer || Buffer.from(id, "hex");
       
@@ -310,11 +307,14 @@ function handleMessage(msg, sourceSocket) {
       const now = Date.now();
       const wasNew = !stored;
       
-      // Store raw DER buffer instead of heavy KeyObject (~100 bytes vs ~2-5KB)
-      // Note: seenPeers is capped at MAX_PEERS, but peerCounter tracks all
-      seenPeers.set(id, { seq, lastSeen: now, keyDer });
+      // Store in seenPeers only if we have room (memory limit)
+      // But we still count and relay even if we can't store
+      const canStore = stored || seenPeers.size < MAX_PEERS;
+      if (canStore) {
+        seenPeers.set(id, { seq, lastSeen: now, keyDer });
+      }
 
-      if (wasNew || countChanged) broadcastUpdate();
+      if ((wasNew && canStore) || countChanged) broadcastUpdate();
 
       // Only relay if we haven't already relayed this message (bloom filter check)
       if (hops < 3 && !hasRelayedMessage(id, seq)) {
