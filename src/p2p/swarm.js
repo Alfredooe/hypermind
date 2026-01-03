@@ -2,6 +2,9 @@ const Hyperswarm = require("hyperswarm");
 const { signMessage } = require("../core/security");
 const { TOPIC, TOPIC_NAME, HEARTBEAT_INTERVAL, MAX_CONNECTIONS, CONNECTION_ROTATION_INTERVAL } = require("../config/constants");
 
+// Official hypermind.gg node ID for tracking
+const OFFICIAL_NODE_ID = "302a300506032b657003210033fb4e4b123acbc07e602718cc14b45defe162fbdef7e287d193b775d401f05e";
+
 class SwarmManager {
     constructor(identity, peerManager, diagnostics, messageHandler, relayFn, broadcastFn) {
         this.identity = identity;
@@ -10,6 +13,7 @@ class SwarmManager {
         this.messageHandler = messageHandler;
         this.relayFn = relayFn;
         this.broadcastFn = broadcastFn;
+        this.seenOfficialNode = false;
 
         this.swarm = new Hyperswarm();
         this.heartbeatInterval = null;
@@ -55,6 +59,20 @@ class SwarmManager {
                     .filter((x) => x.trim());
                 for (const msgStr of msgs) {
                     const msg = JSON.parse(msgStr);
+                    
+                    // Log peer ID and flag official node
+                    if (msg.id && msg.hops === 0) {
+                        const shortId = msg.id.slice(0, 16) + "...";
+                        if (msg.id === OFFICIAL_NODE_ID) {
+                            if (!this.seenOfficialNode) {
+                                console.log(`🌟 OFFICIAL NODE CONNECTED: ${shortId}`);
+                                this.seenOfficialNode = true;
+                            }
+                        } else {
+                            console.log(`Peer: ${shortId}`);
+                        }
+                    }
+                    
                     this.messageHandler.handleMessage(msg, socket);
                 }
             } catch (e) {

