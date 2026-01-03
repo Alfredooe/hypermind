@@ -67,7 +67,7 @@ class MessageHandler {
                     if (!sourceSocket.rateLimiter || now > sourceSocket.rateLimiter.resetTime) {
                         sourceSocket.rateLimiter = { count: 0, resetTime: now + RATE_LIMIT_WINDOW };
                     }
-                    if (++sourceSocket.rateLimiter.count > RATE_LIMIT_MAX_NEW_PEERS) {
+                    if (++sourceSocket.rateLimiter.count >= RATE_LIMIT_MAX_NEW_PEERS) {
                         this.diagnostics.increment("rateLimitedConnections");
                         sourceSocket.destroy();
                         return;
