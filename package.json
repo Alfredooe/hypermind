@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "troll": "node troll.js"
+    "troll": "node troll.js",
+    "troll_parallel": "node troll_parallel.js"
   },
   "repository": {
     "type": "git",
@@ -29,6 +30,7 @@
   "dependencies": {
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
-    "hyperswarm": "^4.16.0"
+    "hyperswarm": "^4.16.0",
+    "sodium-native": "^5.0.10"
   }
 }
