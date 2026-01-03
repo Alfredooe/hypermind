@@ -1,5 +1,5 @@
 const { verifyPoW, verifySignature, createPublicKey } = require("../core/security");
-const { MAX_RELAY_HOPS } = require("../config/constants");
+const { MAX_RELAY_HOPS, RATE_LIMIT_WINDOW, RATE_LIMIT_MAX_NEW_PEERS } = require("../config/constants");
 const { BloomFilterManager } = require("../state/bloom");
 
 class MessageHandler {
@@ -62,10 +62,20 @@ class MessageHandler {
             if (wasNew) {
                 this.diagnostics.increment("newPeersAdded");
                 this.broadcastCallback();
+                if (hops === 0) {
+                    const now = Date.now();
+                    if (!sourceSocket.rateLimiter || now > sourceSocket.rateLimiter.resetTime) {
+                        sourceSocket.rateLimiter = { count: 0, resetTime: now + RATE_LIMIT_WINDOW };
+                    }
+                    if (++sourceSocket.rateLimiter.count > RATE_LIMIT_MAX_NEW_PEERS) {
+                        this.diagnostics.increment("rateLimitedConnections");
+                        sourceSocket.destroy();
+                        return;
+                    }
+                }
             }
 
             // Only relay if we haven't already relayed this message (bloom filter check)
-            // Security: hops must be >= 0 to prevent negative hops bypass attack
             if (hops >= 0 && hops < MAX_RELAY_HOPS && !this.bloomFilter.hasRelayed(id, seq)) {
                 this.bloomFilter.markRelayed(id, seq);
                 this.diagnostics.increment("heartbeatsRelayed");

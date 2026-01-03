@@ -25,6 +25,10 @@ const BROADCAST_THROTTLE = 1000;
 const DIAGNOSTICS_INTERVAL = 10000;
 const PORT = process.env.PORT || 3000;
 
+// Rate Limiting: Semi effective mitigation to limit abuse from malicious peers / Sybil attack leveraging weak PoW. 100 new peers per 5 seconds per connection.
+const RATE_LIMIT_WINDOW = 5000;
+const RATE_LIMIT_MAX_NEW_PEERS = 100;
+
 module.exports = {
     TOPIC_NAME,
     TOPIC,
@@ -39,4 +43,6 @@ module.exports = {
     BROADCAST_THROTTLE,
     DIAGNOSTICS_INTERVAL,
     PORT,
+    RATE_LIMIT_WINDOW,
+    RATE_LIMIT_MAX_NEW_PEERS,
 };

@@ -12,6 +12,7 @@ class DiagnosticsManager {
             bytesReceived: 0,
             bytesRelayed: 0,
             leaveMessages: 0,
+            rateLimitedConnections: 0,
         };
 
         this.interval = null;
