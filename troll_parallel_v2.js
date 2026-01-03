@@ -170,23 +170,29 @@ class SybilAttacker {
                 }
             });
 
-            this.signingWorkers.push({
+            worker.setMaxListeners(100);
+            
+            const sw = {
                 worker,
-                pending: null
+                resolver: null
+            };
+
+            // Single persistent listener
+            worker.on('message', (msg) => {
+                if (msg.type === 'heartbeats' && sw.resolver) {
+                    sw.resolver(msg.data);
+                    sw.resolver = null;
+                }
             });
+
+            this.signingWorkers.push(sw);
         }
     }
 
     async generateAllHeartbeats() {
-        const promises = this.signingWorkers.map((sw, idx) => {
+        const promises = this.signingWorkers.map((sw) => {
             return new Promise((resolve) => {
-                const handler = (msg) => {
-                    if (msg.type === 'heartbeats') {
-                        sw.worker.off('message', handler);
-                        resolve(msg.data);
-                    }
-                };
-                sw.worker.on('message', handler);
+                sw.resolver = resolve;
                 sw.worker.postMessage({ type: 'generateHeartbeats' });
             });
         });
@@ -236,9 +242,16 @@ class SybilAttacker {
     }
 
     startHeartbeatLoop() {
+        let isRunning = false;
+
         const sendHeartbeats = async () => {
             if (this.connections.size === 0) return;
+            if (isRunning) {
+                console.log('Skipping heartbeat cycle - previous still running');
+                return;
+            }
 
+            isRunning = true;
             const start = Date.now();
             const allHeartbeats = await this.generateAllHeartbeats();
             const signTime = Date.now() - start;
@@ -250,6 +263,7 @@ class SybilAttacker {
             }
 
             console.log(`Heartbeat cycle: ${this.fakePeers.length} peers × ${this.connections.size} connections in ${signTime}ms`);
+            isRunning = false;
         };
 
         // Initial send
