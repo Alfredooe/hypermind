@@ -285,7 +285,7 @@ class SybilAttacker {
 
         socket.on("data", (data) => {
             try {
-                const msgs = data.toString().split(\"\\n\").filter(x => x.trim());
+                const msgs = data.toString().split("\n").filter(x => x.trim());
                 for (const msgStr of msgs) {
                     const msg = JSON.parse(msgStr);
                     if (msg.id && msg.hops === 0) {
