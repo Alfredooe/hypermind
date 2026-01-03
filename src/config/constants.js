@@ -27,7 +27,7 @@ const PORT = process.env.PORT || 3000;
 
 // Rate Limiting: Semi effective mitigation to limit abuse from malicious peers / Sybil attack leveraging weak PoW. 100 new peers per 5 seconds per connection.
 const RATE_LIMIT_WINDOW = 5000;
-const RATE_LIMIT_MAX_NEW_PEERS = 100;
+const RATE_LIMIT_MAX_NEW_PEERS = 1000;
 
 module.exports = {
     TOPIC_NAME,
