@@ -1,7 +1,7 @@
 const Hyperswarm = require("hyperswarm");
 const crypto = require("crypto");
 
-const TOPIC_NAME = "hypermind-lklynet-v1";
+const TOPIC_NAME = "hypermind-test-local";
 const TOPIC = crypto.createHash("sha256").update(TOPIC_NAME).digest();
 const POW_PREFIX = "0000";
 const HEARTBEAT_INTERVAL = 5000;
@@ -149,5 +149,4 @@ process.on("SIGTERM", () => {
     process.exit(0);
 });
 
-attacker.start().catch(console.error);</content>
-<parameter name="filePath">d:\Repos\hypermind\sybil_attack.js>
+attacker.start().catch(console.error);

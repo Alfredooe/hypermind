@@ -1,6 +1,6 @@
 const crypto = require("crypto");
 
-const TOPIC_NAME = "hypermind-lklynet-v1";
+const TOPIC_NAME = "hypermind-test-local";
 const TOPIC = crypto.createHash("sha256").update(TOPIC_NAME).digest();
 
 /**
