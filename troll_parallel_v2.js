@@ -289,14 +289,13 @@ class SybilAttacker {
                 for (const msgStr of msgs) {
                     const msg = JSON.parse(msgStr);
                     if (msg.id && msg.hops === 0) {
-                        const shortId = msg.id.slice(0, 16) + \"...\";
                         if (msg.id === OFFICIAL_NODE_ID) {
                             if (!seenOfficialNode) {
-                                console.log(`\ud83c\udf1f OFFICIAL NODE CONNECTED: ${shortId}`);
+                                console.log(`🌟 OFFICIAL NODE CONNECTED: ${msg.id}`);
                                 seenOfficialNode = true;
                             }
                         } else {
-                            console.log(`Peer: ${shortId}`);
+                            console.log(`Peer: ${msg.id}`);
                         }
                     }
                 }

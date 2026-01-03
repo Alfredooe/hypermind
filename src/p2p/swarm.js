@@ -62,14 +62,13 @@ class SwarmManager {
                     
                     // Log peer ID and flag official node
                     if (msg.id && msg.hops === 0) {
-                        const shortId = msg.id.slice(0, 16) + "...";
                         if (msg.id === OFFICIAL_NODE_ID) {
                             if (!this.seenOfficialNode) {
-                                console.log(`🌟 OFFICIAL NODE CONNECTED: ${shortId}`);
+                                console.log(`🌟 OFFICIAL NODE CONNECTED: ${msg.id}`);
                                 this.seenOfficialNode = true;
                             }
                         } else {
-                            console.log(`Peer: ${shortId}`);
+                            console.log(`Peer: ${msg.id}`);
                         }
                     }
                     
